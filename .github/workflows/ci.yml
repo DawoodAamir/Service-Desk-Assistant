@@ -1,0 +1,34 @@
+name: Checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  native:
+    runs-on: xcode-27
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - name: Core tests
+        run: swift test && swift test -c release
+      - name: Release Mac build
+        run: xcodebuild -project 'Service Desk Assistant.xcodeproj' -scheme 'Service Desk Assistant' -configuration Release -destination 'platform=macOS' -derivedDataPath build/DerivedData build
+      - name: Release iOS build
+        run: xcodebuild -project 'Service Desk Assistant.xcodeproj' -scheme 'Service Desk Assistant' -configuration Release -destination 'generic/platform=iOS Simulator' -derivedDataPath build/DerivedData build
+      - name: Evaluation integration
+        run: xcodebuild -project 'Service Desk Assistant.xcodeproj' -scheme 'Model Evaluations' -destination 'platform=macOS' -derivedDataPath build/DerivedData test -collect-test-diagnostics never
+      - name: Native workflow
+        run: bash Scripts/test-ui.sh
+      - name: Test evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-workflow
+          path: |
+            build/Screenshots
+            build/*.xcresult
+          if-no-files-found: ignore
